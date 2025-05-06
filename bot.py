@@ -2,33 +2,39 @@ import discord
 from discord import app_commands
 import os
 import dotenv
+import subprocess
 
 dotenv.load_dotenv()
+TOKEN = os.environ["DISCORD_TOKEN"]
+GUILD_ID = 1133921658034462790
 
-TOKEN = os.environ["DISCORD_TOKEN"]#環境変数からトークンを取得
+class MyClient(discord.Client):
+    def __init__(self):
+        super().__init__(intents=discord.Intents.default())
+        self.tree = app_commands.CommandTree(self)
 
-intents = discord.Intents.default()#適当に。
-client = discord.Client(intents=intents)
-tree = app_commands.CommandTree(client)
+    async def setup_hook(self):
+        # コマンド登録
+        self.tree.add_command(diag)  # 明示的に追加しないと登録されないことがある
+        await self.tree.sync(guild=discord.Object(id=GUILD_ID))
+        print("✅ コマンド同期完了")
 
-@client.event
-async def on_ready():
-    print("起動完了")
-    await tree.sync()#スラッシュコマンドを同期
+client = MyClient()
 
-@tree.command()
+@client.tree.command(name="diag", description="ラズパイの状態を表示します", guild=discord.Object(id=GUILD_ID))
 async def diag(interaction: discord.Interaction):
-    embed = discord.Embed(title="状況",
-                      description="ラズパイの今の情報\n\nここにoutputを書く",
-                      colour=0x00b0f4)
-
-    embed.set_author(name="Raspi Info",
-                 icon_url="https://www.wireguard.com/img/wireguard.svg")
-
-    embed.add_field(name="A New Field",
-                value="",
-                inline=False)
-
+    await interaction.response.defer(thinking=True)
+    res = subprocess.run(["/home/user/shikatsu/.venv/bin/python", "/home/user/shikatsu/py/start.py", "False"], capture_output=True, text=True)
+    embed = discord.Embed(
+        title="状況",
+        description="ラズパイの今の情報\n\n" + res.stdout,
+        colour=0x00b0f4
+    )
+    embed.set_author(
+        name="Raspi Info",
+        icon_url="https://www.wireguard.com/img/wireguard.svg"
+    )
+    embed.add_field(name="A New Field", value=" ", inline=False)
     await interaction.response.send_message(embed=embed)
 
 client.run(TOKEN)
